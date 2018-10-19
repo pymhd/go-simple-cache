@@ -32,7 +32,7 @@ func init() {
 	cache = new(Cache)
 	cache.data = u
 
-	cleanUpTicker := time.NewTicker(30 * time.Second)
+	cleanUpTicker := time.NewTicker(30 * time.Minute)
 	go func() {
 		for _ = range cleanUpTicker.C {
 			cleanUp()		
@@ -64,6 +64,7 @@ func Add(k string, d interface{}, ttl time.Duration) {
 	cache.data[k] = v
 }
 
+
 func Get(k string) interface{} {
 	cache.mu.Lock()
         defer cache.mu.Unlock()
@@ -81,6 +82,15 @@ func Get(k string) interface{} {
 	cache.data[k].atime = time.Now()
 	return v.data		
 }
+
+
+func Size() int {
+	cache.mu.Lock()
+        defer cache.mu.Unlock()
+
+        return len(cache.data)
+}
+
 
 func Stats() (s, e int32) {
 	s = atomic.LoadInt32(&errorC) 
