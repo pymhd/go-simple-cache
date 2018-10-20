@@ -22,8 +22,12 @@ type Cache struct {
 
 var (
 	cache    *Cache
+	
 	errorC   int32
 	successC int32
+	
+	defaultCleanUpTicker  *time.Ticker
+	cleanUpSec time.Duration 
 )
 
 
@@ -32,9 +36,9 @@ func init() {
 	cache = new(Cache)
 	cache.data = u
 
-	cleanUpTicker := time.NewTicker(30 * time.Minute)
+	defaultCleanUpTicker = time.NewTicker(30 * time.Minute)
 	go func() {
-		for _ = range cleanUpTicker.C {
+		for _ = range defaultCleanUpTicker.C {
 			cleanUp()		
 		}
 	}()
@@ -64,7 +68,6 @@ func Add(k string, d interface{}, ttl time.Duration) {
 	cache.data[k] = v
 }
 
-
 func Get(k string) interface{} {
 	cache.mu.Lock()
         defer cache.mu.Unlock()
@@ -72,12 +75,12 @@ func Get(k string) interface{} {
         v, ok := cache.data[k]
         if !ok {
         	
-        	go inc(errorC)
+        	go inc(&errorC)
         	
         	return nil
 	}
 	
-	go inc(successC)        
+	inc(&successC)        
 	
 	cache.data[k].atime = time.Now()
 	return v.data		
@@ -85,7 +88,7 @@ func Get(k string) interface{} {
 
 
 func Size() int {
-	cache.mu.Lock()
+        cache.mu.Lock()
         defer cache.mu.Unlock()
 
         return len(cache.data)
@@ -96,6 +99,19 @@ func Stats() (s, e int32) {
 	s = atomic.LoadInt32(&errorC) 
 	e = atomic.LoadInt32(&successC)
 	return
+}
+
+
+func SetCleanUpTime(t time.Duration) {
+	//stop default cleaner
+	defaultCleanUpTicker.Stop()
+	
+	newCleanUpTicker := time.NewTicker(t)
+        go func() {
+                for _ = range newCleanUpTicker.C {
+                        cleanUp()               
+                }
+        }()
 }
 
 
@@ -117,11 +133,12 @@ func cleanUp() {
 
 
 //atomic.AddUint64(&ops, 1)
-func inc(c int32) {
-	atomic.AddInt32(&c, 1)
+func inc(c *int32) {
+	atomic.AddInt32(c, 1)
 }
 
 
-func dec(c int32) {
-	atomic.AddInt32(&c, -1)
+func dec(c *int32) {
+	atomic.AddInt32(c, -1)
 }
+
