@@ -1,9 +1,7 @@
-package main
-//package cache
+package cache
 
 import (
 	"os"
-	"fmt"
 	"time"
 	"sync"
 	"sync/atomic"
@@ -54,12 +52,15 @@ func (cache *Cache) Get(k string) interface{} {
 
 	v, ok := cache.Data[k]
 	if !ok {
-
 		go inc(&errorC)
-
 		return nil
 	}
 
+	if time.Since(v.AccessTime) > v.TTL {
+		go inc(&errorC)
+		return nil
+	}
+	
 	go inc(&successC)
 
 	cache.Data[k].AccessTime = time.Now()
@@ -107,6 +108,33 @@ func (cache *Cache) cleanUp() {
 	}
 }
 
+
+func (cache *Cache) Save(f string) error {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	
+	return cache.save(f)
+}
+
+func  (cache *Cache) save(f string) error {
+	out, err := os.Create(f)
+	if err != nil {
+		return err
+	}
+	
+	return json.NewEncoder(out).Encode(cache)
+}
+
+
+//atomic.AddUint64(&ops, 1)
+func inc(c *int32) {
+	atomic.AddInt32(c, 1)
+}
+
+func dec(c *int32) {
+	atomic.AddInt32(c, -1)
+}
+
 func New(file string) *Cache {
 	cache := new(Cache)
 	
@@ -124,40 +152,5 @@ func New(file string) *Cache {
 		}
 	}()
 	return cache
-}
-
-func (cache *Cache) Save(f string) error {
-	cache.mu.Lock()
-	defer cache.mu.Unlock()
-	
-	return cache.save(f)
-}
-func  (cache *Cache) save(f string) error {
-	out, err := os.Create(f)
-	if err != nil {
-		return err
-	}
-	
-	return json.NewEncoder(out).Encode(cache)
-}
-
-//atomic.AddUint64(&ops, 1)
-func inc(c *int32) {
-	atomic.AddInt32(c, 1)
-}
-
-func dec(c *int32) {
-	atomic.AddInt32(c, -1)
-}
-
-
-func main() {
-	c := New("txt")
-	
-	c.Add("test", 5, "60s")
-	c.Add("huest", 100, "60s")
-	
-	//e := c.Save("txt")
-	fmt.Println(c.Data["test"])
 }
 
