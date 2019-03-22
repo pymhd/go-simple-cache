@@ -1,26 +1,26 @@
 package cache
 
 import (
+	"encoding/json"
 	"os"
-	"time"
 	"sync"
 	"sync/atomic"
-	"encoding/json"
+	"time"
 )
 
 var (
 	errorC   int32
 	successC int32
 
-	defaultCleanUpTicker *time.Ticker = time.NewTicker(30 * time.Minute)
+	defaultCleanUpTicker = time.NewTicker(30 * time.Minute)
 )
 
 type Underlay map[string]*Value
 
 type Value struct {
-	Data  interface{}   `json:"data"`
+	Data       interface{}   `json:"data"`
 	AccessTime time.Time     `json:"attime"`
-	TTL   time.Duration `json:"ttl"`
+	TTL        time.Duration `json:"ttl"`
 }
 
 type Cache struct {
@@ -28,7 +28,7 @@ type Cache struct {
 	Data Underlay `json:"result"`
 }
 
-func (cache *Cache) Add(k string, d interface{}, ttl string)  {
+func (cache *Cache) Add(k string, d interface{}, ttl string) {
 	now := time.Now()
 
 	v := new(Value)
@@ -60,7 +60,7 @@ func (cache *Cache) Get(k string) interface{} {
 		go inc(&errorC)
 		return nil
 	}
-	
+
 	go inc(&successC)
 
 	cache.Data[k].AccessTime = time.Now()
@@ -75,8 +75,8 @@ func (cache *Cache) Size() int {
 }
 
 func (cache *Cache) Stats() (s, e int32) {
-	s = atomic.LoadInt32(&errorC)
-	e = atomic.LoadInt32(&successC)
+	s = atomic.LoadInt32(&successC)
+	e = atomic.LoadInt32(&errorC)
 	return
 }
 
@@ -86,7 +86,7 @@ func (cache *Cache) SetCleanUpTime(t time.Duration) {
 
 	newCleanUpTicker := time.NewTicker(t)
 	go func() {
-		for _ = range newCleanUpTicker.C {
+		for range newCleanUpTicker.C {
 			cache.cleanUp()
 		}
 	}()
@@ -108,23 +108,21 @@ func (cache *Cache) cleanUp() {
 	}
 }
 
-
 func (cache *Cache) Save(f string) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
-	
+
 	return cache.save(f)
 }
 
-func  (cache *Cache) save(f string) error {
+func (cache *Cache) save(f string) error {
 	out, err := os.Create(f)
 	if err != nil {
 		return err
 	}
-	
+
 	return json.NewEncoder(out).Encode(cache)
 }
-
 
 //atomic.AddUint64(&ops, 1)
 func inc(c *int32) {
@@ -137,20 +135,19 @@ func dec(c *int32) {
 
 func New(file string) *Cache {
 	cache := new(Cache)
-	
+
 	in, _ := os.Open(file)
 	defer in.Close()
-	
+
 	if err := json.NewDecoder(in).Decode(cache); err != nil {
 		//could not load values from file
 		u := make(Underlay, 0)
 		cache.Data = u
 	}
 	go func() {
-		for _ = range defaultCleanUpTicker.C {
+		for range defaultCleanUpTicker.C {
 			cache.cleanUp()
 		}
 	}()
 	return cache
 }
-
