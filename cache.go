@@ -1,6 +1,7 @@
-package cache
+package main
 
 import (
+	"fmt"
 	"encoding/json"
 	"os"
 	"sync"
@@ -19,6 +20,7 @@ type Underlay map[string]*Value
 
 type Value struct {
 	Data       interface{}   `json:"data"`
+	Ldata	   []interface{} `json:"ldata"`
 	AccessTime time.Time     `json:"attime"`
 	TTL        time.Duration `json:"ttl"`
 }
@@ -28,7 +30,7 @@ type Cache struct {
 	Data Underlay `json:"result"`
 }
 
-func (cache *Cache) Add(k string, d interface{}, ttl string) {
+func (cache *Cache) Set(k string, d interface{}, ttl string) {
 	now := time.Now()
 
 	v := new(Value)
@@ -44,6 +46,36 @@ func (cache *Cache) Add(k string, d interface{}, ttl string) {
 	defer cache.mu.Unlock()
 
 	cache.Data[k] = v
+}
+
+func (cache *Cache) Add(k string, d interface{}) {
+	cache.mu.Lock()
+        defer cache.mu.Unlock()
+	
+	v, ok  := cache.Data[k]
+	if ok {
+		v.Ldata = append(v.Ldata, d)
+		return
+	}
+	v = new(Value)
+	v.Ldata = []interface{}{d}
+	cache.Data[k] = v
+}
+
+func (cache *Cache) IsIn(k string, d interface{}) bool {
+	cache.mu.Lock()
+        defer cache.mu.Unlock()
+        
+        v, ok  := cache.Data[k]
+        if !ok {
+        	return false
+        }
+        for _, data := range v.Ldata {
+        	if d == data {
+        		return true
+        	}
+        }
+        return false
 }
 
 func (cache *Cache) Get(k string) interface{} {
@@ -151,3 +183,14 @@ func New(file string) *Cache {
 	}()
 	return cache
 }
+
+type S struct {
+	A string
+	B string
+}
+
+type SS struct {
+        B string
+        A string
+}
+
