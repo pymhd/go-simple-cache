@@ -156,7 +156,7 @@ func (cache *Cache) save(f string) error {
 	return json.NewEncoder(out).Encode(cache)
 }
 
-//atomic.AddUint64(&ops, 1)
+// atomic.AddUint64(&ops, 1)
 func inc(c *int32) {
 	atomic.AddInt32(c, 1)
 }
