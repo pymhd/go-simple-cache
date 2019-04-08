@@ -1,4 +1,4 @@
-package main
+package cache
 
 import (
 	"fmt"
@@ -182,15 +182,5 @@ func New(file string) *Cache {
 		}
 	}()
 	return cache
-}
-
-type S struct {
-	A string
-	B string
-}
-
-type SS struct {
-        B string
-        A string
 }
 
